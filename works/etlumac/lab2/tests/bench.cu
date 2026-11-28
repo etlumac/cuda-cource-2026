@@ -15,10 +15,10 @@
 
 namespace {
 
-constexpr int kWarmupRuns = 3;
-constexpr int kTimedRuns = 20;
+constexpr int warmup_runs = 3;
+constexpr int timed_runs = 20;
 // Размеры блока и тайла для эксперимента.
-constexpr int kTiles[] = {8, 16, 32};
+constexpr int tile_sizes[] = {8, 16, 32};
 
 struct Size {
   int m;
@@ -116,12 +116,12 @@ void BenchVariant(int variant, int tile, cublasHandle_t handle,
                   const DeviceData& data, const Size& size) {
   const char* names[] = {"naive", "tiled", "cublas"};
 
-  float warmup[kWarmupRuns];
-  for (int i = 0; i < kWarmupRuns; ++i) {
+  float warmup[warmup_runs];
+  for (int i = 0; i < warmup_runs; ++i) {
     warmup[i] = RunVariant(variant, tile, handle, data, size);
   }
   std::vector<float> times;
-  for (int i = 0; i < kTimedRuns; ++i) {
+  for (int i = 0; i < timed_runs; ++i) {
     times.push_back(RunVariant(variant, tile, handle, data, size));
   }
 
@@ -156,13 +156,13 @@ int main() {
   std::printf(
       "Time is kernel only (cudaEvent); no allocation, no CPU<->GPU copy\n");
   std::printf("Warmup runs: %d (printed), timed runs: %d (median)\n\n",
-              kWarmupRuns, kTimedRuns);
+              warmup_runs, timed_runs);
   std::printf("%-14s %-7s %-5s %9s %9s %9s %11s %10s\n", "size", "variant",
               "tile", "run1_ms", "run2_ms", "run3_ms", "median_ms", "GFLOP/s");
   for (const Size& size : sizes) {
     DeviceData data = AllocateData(size);
     for (int variant = 0; variant < 2; ++variant) {
-      for (int tile : kTiles) {
+      for (int tile : tile_sizes) {
         BenchVariant(variant, tile, handle, data, size);
       }
     }

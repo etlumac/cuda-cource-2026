@@ -16,11 +16,11 @@
 
 namespace {
 
-constexpr int kWidth = 32;
-constexpr int kBlocks = 1024;
-constexpr int kIterations = 2000;
-constexpr int kWarmupRuns = 3;
-constexpr int kTimedRuns = 20;
+constexpr int tile_width = 32;
+constexpr int block_count = 1024;
+constexpr int iterations_per_thread = 2000;
+constexpr int warmup_runs = 3;
+constexpr int timed_runs = 20;
 
 void Check(cudaError_t err) {
   if (err != cudaSuccess) {
@@ -36,19 +36,19 @@ void Check(cudaError_t err) {
 // компилятор не вынес чтение из цикла.
 template <int kPad, bool kByColumn>
 __global__ void SharedAccessKernel(float* out, int iterations) {
-  __shared__ float tile[kWidth][kWidth + kPad];
+  __shared__ float tile[tile_width][tile_width + kPad];
 
   int x = threadIdx.x;
   int y = threadIdx.y;
-  tile[y][x] = static_cast<float>(y * kWidth + x);
+  tile[y][x] = static_cast<float>(y * tile_width + x);
   __syncthreads();
 
   float sum = 0.0f;
   for (int i = 0; i < iterations; ++i) {
-    int shifted = (x + i) & (kWidth - 1);
+    int shifted = (x + i) & (tile_width - 1);
     sum += kByColumn ? tile[shifted][y] : tile[y][shifted];
   }
-  out[(blockIdx.x * kWidth + y) * kWidth + x] = sum;
+  out[(blockIdx.x * tile_width + y) * tile_width + x] = sum;
 }
 
 // Один запуск ядра, возвращает время в миллисекундах.
@@ -61,7 +61,8 @@ float TimeOnce(float* d_out) {
 
   Check(cudaEventRecord(start));
   SharedAccessKernel<kPad, kByColumn>
-      <<<kBlocks, dim3(kWidth, kWidth)>>>(d_out, kIterations);
+      <<<block_count, dim3(tile_width, tile_width)>>>(d_out,
+                                                      iterations_per_thread);
   Check(cudaGetLastError());
   Check(cudaEventRecord(stop));
   Check(cudaEventSynchronize(stop));
@@ -77,21 +78,21 @@ float TimeOnce(float* d_out) {
 // Результат ядра копируем в *result, чтобы потом сравнить варианты.
 template <int kPad, bool kByColumn>
 double Measure(const char* name, float* d_out, std::vector<float>* result) {
-  float warmup[kWarmupRuns];
-  for (int i = 0; i < kWarmupRuns; ++i) {
+  float warmup[warmup_runs];
+  for (int i = 0; i < warmup_runs; ++i) {
     warmup[i] = TimeOnce<kPad, kByColumn>(d_out);
   }
   std::vector<float> times;
-  for (int i = 0; i < kTimedRuns; ++i) {
+  for (int i = 0; i < timed_runs; ++i) {
     times.push_back(TimeOnce<kPad, kByColumn>(d_out));
   }
   std::sort(times.begin(), times.end());
   const double median_ms = times[times.size() / 2];
 
-  result->resize(static_cast<size_t>(kBlocks) * kWidth * kWidth);
+  result->resize(static_cast<size_t>(block_count) * tile_width * tile_width);
   Check(cudaMemcpy(result->data(), d_out, result->size() * sizeof(float),
                    cudaMemcpyDeviceToHost));
-  std::printf("%-26s %-7d %9.4f %9.4f %9.4f %11.4f\n", name, kWidth + kPad,
+  std::printf("%-26s %-7d %9.4f %9.4f %9.4f %11.4f\n", name, tile_width + kPad,
               warmup[0], warmup[1], warmup[2], median_ms);
   return median_ms;
 }
@@ -100,11 +101,11 @@ double Measure(const char* name, float* d_out, std::vector<float>* result) {
 
 int main() {
   float* d_out = nullptr;
-  Check(cudaMalloc(
-      &d_out, static_cast<size_t>(kBlocks) * kWidth * kWidth * sizeof(float)));
+  Check(cudaMalloc(&d_out, static_cast<size_t>(block_count) * tile_width *
+                               tile_width * sizeof(float)));
 
   std::printf("Blocks: %d (32x32 threads), iterations per thread: %d\n",
-              kBlocks, kIterations);
+              block_count, iterations_per_thread);
   std::printf("%-26s %-7s %9s %9s %9s %11s\n", "variant", "stride", "run1_ms",
               "run2_ms", "run3_ms", "median_ms");
 

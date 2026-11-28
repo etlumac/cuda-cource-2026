@@ -18,9 +18,9 @@ namespace {
 
 // u = 2^-24, единица округления для float.
 // Размеры блока и тайла, которые проверяем.
-constexpr int kTiles[] = {8, 16, 32};
+constexpr int tile_sizes[] = {8, 16, 32};
 
-constexpr double kUnitRoundoff = 5.9604644775390625e-08;
+constexpr double unit_roundoff = 5.9604644775390625e-08;
 
 struct Size {
   int m;
@@ -109,7 +109,7 @@ void ReferenceGemm(cublasHandle_t handle, const std::vector<float>& a,
 }
 
 // gamma(q) = q * u / (1 - q * u).
-double Gamma(double q) { return q * kUnitRoundoff / (1.0 - q * kUnitRoundoff); }
+double Gamma(double q) { return q * unit_roundoff / (1.0 - q * unit_roundoff); }
 
 // Сравнивает наш результат с эталоном. sums - массив S (сумма модулей
 // произведений), посчитанный тем же cuBLAS на матрицах из модулей.
@@ -194,7 +194,7 @@ int main() {
   for (const Size& size : sizes) {
     for (int mode = 0; mode < 2; ++mode) {
       Result total;
-      for (int tile : kTiles) {
+      for (int tile : tile_sizes) {
         for (int kind = 0; kind < 3; ++kind) {
           total = Merge(total, RunOne(handle, size, kind, mode == 1, tile));
         }

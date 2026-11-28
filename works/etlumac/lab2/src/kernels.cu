@@ -10,7 +10,7 @@ namespace {
 
 // Размер блока и тайла по умолчанию: 16 x 16. Для экспериментов поддерживаются
 // ещё 8 и 32 (см. LaunchKernel).
-constexpr int kDefaultTile = 16;
+constexpr int default_tile = 16;
 
 // Проверка кода ошибки CUDA: при ошибке печатаем сообщение и выходим с кодом 1.
 void Check(cudaError_t err) {
@@ -136,7 +136,7 @@ void MatMulOnGpuWithTile(const std::vector<float>& a,
 
 void MatMulOnGpu(const std::vector<float>& a, const std::vector<float>& b,
                  int m, int k, int n, bool tiled, std::vector<float>* c) {
-  MatMulOnGpuWithTile(a, b, m, k, n, tiled, kDefaultTile, c);
+  MatMulOnGpuWithTile(a, b, m, k, n, tiled, default_tile, c);
 }
 
 float TimeMatMulKernel(const float* d_a, const float* d_b, float* d_c, int m,
